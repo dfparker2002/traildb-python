@@ -92,7 +92,8 @@ class TestAPI(unittest.TestCase):
         db = TrailDB('testtrail')
         self.assertEqual(['time', 'field1', 'field2'], db.fields)
 
-    def test_uuids(self): db = TrailDB('testtrail')
+    def test_uuids(self):
+        db = TrailDB('testtrail')
         self.assertEqual(0, db.get_trail_id(self.uuid))
         self.assertEqual(self.uuid, db.get_uuid(0))
         self.assertTrue(self.uuid in db)
