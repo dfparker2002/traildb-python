@@ -7,7 +7,6 @@ from builtins import int
 from builtins import range
 from past.builtins import basestring
 from builtins import object
-from collections import namedtuple
 from ctypes import c_char, c_char_p, c_ubyte, c_int, c_void_p
 from ctypes import c_uint, c_uint32, c_uint64
 from ctypes import Structure, Union
@@ -307,14 +306,6 @@ class TrailDBCursor(object):
     def __iter__(self):
         return self
 
-    def get_trail(self, trail_id):
-        if lib.tdb_get_trail(self.cursor, trail_id) != 0:
-            raise TrailDBError("Failed to initalize trail in cursor")
-
-        if self.event_filter_obj:
-            if lib.tdb_cursor_set_event_filter(self.cursor, self.event_filter_obj.flt):
-                raise TrailDBError("cursor_set_event_filter failed")
-
     def __next__(self):
         """Return the next event in the trail."""
         event = lib.tdb_cursor_next(self.cursor)
@@ -334,6 +325,14 @@ class TrailDBCursor(object):
             return self.cls(False, timestamp, *items)
         else:
             return self.cls(True, timestamp, *items)
+
+    def get_trail(self, trail_id):
+        if lib.tdb_get_trail(self.cursor, trail_id) != 0:
+            raise TrailDBError("Failed to initalize trail in cursor")
+
+        if self.event_filter_obj:
+            if lib.tdb_cursor_set_event_filter(self.cursor, self.event_filter_obj.flt):
+                raise TrailDBError("cursor_set_event_filter failed")
 
 
 def mk_event_class(fields, valuefun):
@@ -376,8 +375,6 @@ class TrailDB(object):
 
       import traildb
       tdb = traildb.TrailDB('blah.tdb')
-
-
     """
 
     def __init__(self, path, decode=True):
@@ -482,7 +479,6 @@ class TrailDB(object):
               event_filter=None):
         """Return a cursor over a single trail.
 
-<<<<<<< HEAD
         :param trail_id: Trail ID to use.
         :param parsetime: If True, returns datetime objects instead of integer timestamps.
         :param rawitems: Return raw integer items instead of stringified values. Using raw items is usually a bit more efficient than using string values.
@@ -652,7 +648,7 @@ class TrailDB(object):
         """
         empty_filter = lib.tdb_event_filter_new_match_none()
         all_filter = lib.tdb_event_filter_new_match_all()
-        value = tdb_opt_value(ptr = empty_filter)
+        value = tdb_opt_value(ptr=empty_filter)
 
         lib.tdb_set_opt(self._db,
                         TDB_OPT_EVENT_FILTER,
@@ -677,7 +673,7 @@ class TrailDB(object):
         """
         empty_filter = lib.tdb_event_filter_new_match_none()
         all_filter = lib.tdb_event_filter_new_match_all()
-        value = tdb_opt_value(ptr = all_filter)
+        value = tdb_opt_value(ptr=all_filter)
 
         lib.tdb_set_opt(self._db,
                         TDB_OPT_EVENT_FILTER,
@@ -781,4 +777,3 @@ class TrailDBEventFilter(object):
 
     def __del__(self):
         lib.tdb_event_filter_free(self.flt)
-
