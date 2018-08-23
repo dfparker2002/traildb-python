@@ -39,6 +39,9 @@ class TestAPI(unittest.TestCase):
             self.assertTrue(hasattr(event, 'field1'))
             self.assertTrue(hasattr(event, 'field2'))
 
+            with self.assertRaises(AttributeError):
+                event.missing_field
+
     def test_trails_selected_uuids(self):
         uuids = ["02345678123456781234567812345678",
                  "12345678123456781234567812345678",
@@ -51,12 +54,12 @@ class TestAPI(unittest.TestCase):
             cons.add(uuid, 2, ['b', '2'])
             cons.add(uuid, 3, ['c', '3'])
         cons.finalize()
-        
+
         tdb = TrailDB('whitelist_testtrail')
         whitelist = [uuids[0],
                      uuids[3],
                      uuids[4]]
-        
+
         expected_length = 3
         for trail_uuid, trail_events in tdb.trails(selected_uuids=whitelist):
             trail_events = list(trail_events)
@@ -129,7 +132,7 @@ class TestAPI(unittest.TestCase):
             cons.add(uuid, 2, ['b', '2'])
             cons.add(uuid, 3, ['c', '3'])
         cons.finalize()
-        
+
         tdb = TrailDB('whitelist_testtrail')
         whitelist = [uuids[0],
                      uuids[3],
@@ -143,7 +146,7 @@ class TestAPI(unittest.TestCase):
                 expected_length = 3
             else:
                 expected_length = 0
-                
+
             trail_events = list(trail_events)
             self.assertEqual(len(trail_events),
                              expected_length)
@@ -160,7 +163,7 @@ class TestAPI(unittest.TestCase):
             cons.add(uuid, 2, ['b', '2'])
             cons.add(uuid, 3, ['c', '3'])
         cons.finalize()
-        
+
         tdb = TrailDB('blacklist_testtrail')
         blacklist = [uuids[1],
                      uuids[2]]
@@ -172,7 +175,7 @@ class TestAPI(unittest.TestCase):
                 expected_length = 0
             else:
                 expected_length = 3
-                
+
             trail_events = list(trail_events)
             self.assertEqual(len(trail_events),
                              expected_length)
@@ -189,7 +192,7 @@ class TestAPI(unittest.TestCase):
             cons.add(uuid, 2, ['b', '2'])
             cons.add(uuid, 3, ['c', '3'])
         cons.finalize()
-        
+
         tdb = TrailDB('whitelist_testtrail')
         whitelist = [uuids[0],
                      uuids[3],
@@ -203,7 +206,7 @@ class TestAPI(unittest.TestCase):
                 expected_length = 3
             else:
                 expected_length = 0
-                
+
             trail_events = list(trail_events)
             self.assertEqual(len(trail_events),
                              expected_length)
@@ -220,7 +223,7 @@ class TestAPI(unittest.TestCase):
             cons.add(uuid, 2, ['b', '2'])
             cons.add(uuid, 3, ['c', '3'])
         cons.finalize()
-        
+
         tdb = TrailDB('blacklist_testtrail')
         blacklist = [uuids[1],
                      uuids[2]]
@@ -232,7 +235,7 @@ class TestAPI(unittest.TestCase):
                 expected_length = 0
             else:
                 expected_length = 3
-                
+
             trail_events = list(trail_events)
             self.assertEqual(len(trail_events),
                              expected_length)

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Get up to date libjudy
+sudo apt-get update
 sudo apt-get install -y libarchive-dev pkg-config build-essential
 wget https://mirrors.kernel.org/ubuntu/pool/universe/j/judy/libjudy-dev_1.0.5-5_amd64.deb \
      https://mirrors.kernel.org/ubuntu/pool/universe/j/judy/libjudydebian1_1.0.5-5_amd64.deb
