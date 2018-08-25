@@ -10,7 +10,7 @@ import unittest
 import datetime
 
 from traildb import TrailDB, TrailDBConstructor, tdb_item_field, tdb_item_val
-from traildb import TrailDBError, TrailDBCursor
+from traildb import TrailDBError, TrailDBCursor, TrailDBMultiCursor
 
 
 class TestAPI(unittest.TestCase):
@@ -180,65 +180,6 @@ class TestAPI(unittest.TestCase):
             self.assertEqual(len(trail_events),
                              expected_length)
 
-    def test_apply_whitelist(self):
-        uuids = ["02345678123456781234567812345678",
-                 "12345678123456781234567812345678",
-                 "22345678123456781234567812345678",
-                 "32345678123456781234567812345678",
-                 "42345678123456781234567812345678"]
-        cons = TrailDBConstructor('whitelist_testtrail', ['field1', 'field2'])
-        for uuid in uuids:
-            cons.add(uuid, 1, ['a', '1'])
-            cons.add(uuid, 2, ['b', '2'])
-            cons.add(uuid, 3, ['c', '3'])
-        cons.finalize()
-
-        tdb = TrailDB('whitelist_testtrail')
-        whitelist = [uuids[0],
-                     uuids[3],
-                     uuids[4]]
-        tdb.apply_whitelist(whitelist)
-        found_trails = list(tdb.trails(parsetime=False))
-
-        self.assertEqual(len(found_trails), len(uuids))
-        for trail_uuid, trail_events in found_trails:
-            if trail_uuid in whitelist:
-                expected_length = 3
-            else:
-                expected_length = 0
-
-            trail_events = list(trail_events)
-            self.assertEqual(len(trail_events),
-                             expected_length)
-
-    def test_apply_blacklist(self):
-        uuids = ["02345678123456781234567812345678",
-                 "12345678123456781234567812345678",
-                 "22345678123456781234567812345678",
-                 "32345678123456781234567812345678",
-                 "42345678123456781234567812345678"]
-        cons = TrailDBConstructor('blacklist_testtrail', ['field1', 'field2'])
-        for uuid in uuids:
-            cons.add(uuid, 1, ['a', '1'])
-            cons.add(uuid, 2, ['b', '2'])
-            cons.add(uuid, 3, ['c', '3'])
-        cons.finalize()
-
-        tdb = TrailDB('blacklist_testtrail')
-        blacklist = [uuids[1],
-                     uuids[2]]
-        tdb.apply_blacklist(blacklist)
-        found_trails = list(tdb.trails(parsetime=False))
-
-        for trail_uuid, trail_events in found_trails:
-            if trail_uuid in blacklist:
-                expected_length = 0
-            else:
-                expected_length = 3
-
-            trail_events = list(trail_events)
-            self.assertEqual(len(trail_events),
-                             expected_length)
 
 class TestFilter(unittest.TestCase):
 
@@ -443,6 +384,133 @@ class TestCons(unittest.TestCase):
     def tearDown(self):
         try:
             os.unlink('testtrail.tdb')
+            os.unlink('testtrail2.tdb')
+        except:
+            pass
+
+
+class TestMultiCursor(unittest.TestCase):
+    def setUp(self):
+        self.uuid1 = '12345678123456781234567812345678'
+        self.uuid2 = '12345678123456781234567812345679'
+
+        cons = TrailDBConstructor('testtrail1', ['field1', 'field2', 'field3'])
+        cons.add(self.uuid1, 1, ['a', '1', 'x'])
+        cons.add(self.uuid1, 2, ['b', '2', 'x'])
+        cons.add(self.uuid2, 1, ['c', '3', 'y'])
+        cons.add(self.uuid2, 2, ['d', '4', 'x'])
+        cons.add(self.uuid2, 3, ['e', '5', 'x'])
+        self.tdb1 = cons.finalize()
+
+        cons = TrailDBConstructor('testtrail2', ['field1', 'field2', 'field3', 'field4'])
+        cons.add(self.uuid2, 4, ['a', '1', 'x', 'l'])
+        cons.add(self.uuid2, 5, ['b', '2', 'x', 'm'])
+        cons.add(self.uuid1, 3, ['c', '3', 'y', 'n'])
+        cons.add(self.uuid1, 4, ['d', '4', 'x', 'o'])
+        cons.add(self.uuid1, 5, ['e', '5', 'x', 'p'])
+        self.tdb2 = cons.finalize()
+
+    def test_multicursor_no_batch(self):
+        c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
+        c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
+        mc = TrailDBMultiCursor(False, False, False, batch_size=0)
+
+        # not initialized, raise error
+        with self.assertRaises(TrailDBError):
+            next(mc)
+        mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
+
+        # exhaust the iterator
+        events = list(mc)
+
+        self.assertEqual(len(events), 5)
+        self.assertEqual(events[0].time, 1)
+        self.assertEqual(events[0].field1, 'a')
+        self.assertEqual(events[0].field2, '1')
+        self.assertEqual(events[0].field3, 'x')
+        self.assertEqual(events[1].time, 2)
+        self.assertEqual(events[1].field1, 'b')
+        self.assertEqual(events[1].field2, '2')
+        self.assertEqual(events[1].field3, 'x')
+        # this one is from the 2nd tdb, has an additional field
+        self.assertEqual(events[2].time, 3)
+        self.assertEqual(events[2].field1, 'c')
+        self.assertEqual(events[2].field2, '3')
+        self.assertEqual(events[2].field3, 'y')
+        self.assertEqual(events[2].field4, 'n')
+
+    def test_multicursor_batch(self):
+        c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
+        c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
+
+        # test with a very small batch size to make sure the batch will get exhausted and refilled at leat once
+        mc = TrailDBMultiCursor(False, False, False, batch_size=2)
+        mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
+
+        # exhaust the iterator
+        events = list(mc)
+
+        self.assertEqual(len(events), 5)
+        self.assertEqual(events[0].time, 1)
+        self.assertEqual(events[0].field1, 'a')
+        self.assertEqual(events[0].field2, '1')
+        self.assertEqual(events[0].field3, 'x')
+        self.assertEqual(events[1].time, 2)
+        self.assertEqual(events[1].field1, 'b')
+        self.assertEqual(events[1].field2, '2')
+        self.assertEqual(events[1].field3, 'x')
+        self.assertEqual(events[2].time, 3)
+        self.assertEqual(events[2].field1, 'c')
+        self.assertEqual(events[2].field2, '3')
+        self.assertEqual(events[2].field3, 'y')
+        self.assertEqual(events[2].field4, 'n')
+
+    def test_multicursor_reuse(self):
+        c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
+        c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
+        mc = TrailDBMultiCursor(False, False, False, batch_size=2)
+        mc.set_cursors([c1.cursor, c2.cursor], [self.tdb1, self.tdb2])
+        # exhaust the iterator
+        list(mc)
+
+        # change the cursors
+        c1.get_trail(self.tdb1.get_trail_id(self.uuid2))
+        c2.get_trail(self.tdb2.get_trail_id(self.uuid2))
+
+        # reset the multicursor
+        mc.reset()
+        events = list(mc)
+
+        self.assertEqual(len(events), 5)
+        self.assertEqual(events[0].time, 1)
+        self.assertEqual(events[0].field1, 'c')
+        self.assertEqual(events[0].field2, '3')
+        self.assertEqual(events[0].field3, 'y')
+        self.assertEqual(events[3].time, 4)
+        self.assertEqual(events[3].field1, 'a')
+        self.assertEqual(events[3].field2, '1')
+        self.assertEqual(events[3].field3, 'x')
+        self.assertEqual(events[3].field4, 'l')
+
+    def test_multicursor_raw_items_parsetime(self):
+        c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
+        c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
+        mc = TrailDBMultiCursor(True, True, False, batch_size=0)
+
+        # not initialized, raise error
+        with self.assertRaises(TrailDBError):
+            next(mc)
+        mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
+
+        # exhaust the iterator
+        events = list(mc)
+
+        # just make sure the length is right and we didn't have any errors
+        self.assertEqual(len(events), 5)
+
+    def tearDown(self):
+        try:
+            os.unlink('testtrail1.tdb')
             os.unlink('testtrail2.tdb')
         except:
             pass
