@@ -443,7 +443,7 @@ class TestMultiCursor(unittest.TestCase):
         c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
         c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
 
-        # test with a very small batch size to make sure the batch will get exhausted and refilled at leat once
+        # test with a very small batch size to make sure the batch will get exhausted and refilled at least once
         mc = TrailDBMultiCursor(False, False, False, batch_size=2)
         mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
 
@@ -496,12 +496,7 @@ class TestMultiCursor(unittest.TestCase):
         c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
         c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
         mc = TrailDBMultiCursor(True, True, False, batch_size=0)
-
-        # not initialized, raise error
-        with self.assertRaises(TrailDBError):
-            next(mc)
         mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
-
         # exhaust the iterator
         events = list(mc)
 
