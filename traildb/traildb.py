@@ -432,7 +432,6 @@ class TrailDBMultiCursor(object):
         event = multi_event.tdb_event
         tdb_ptr = multi_event.tdb
 
-        breakpoint()
         timestamp = event.contents.timestamp
         if self.parsetime:
             timestamp = datetime.fromtimestamp(event.contents.timestamp)
@@ -469,6 +468,8 @@ class TrailDBMultiCursor(object):
         self._cursors = cursors
 
         self.multicursor = lib.tdb_multi_cursor_new(cursor_array, n_cursors)
+        if self.multicursor is None:
+            raise TrailDBError("Failed to allocate memory for multicursor")
         self.reset()
 
         # mapping of the traildb pointer to the TrailDB object
