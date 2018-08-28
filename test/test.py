@@ -410,10 +410,10 @@ class TestMultiCursor(unittest.TestCase):
         cons.add(self.uuid1, 5, ['e', '5', 'x', 'p'])
         self.tdb2 = cons.finalize()
 
-    def test_multicursor_no_batch(self):
+    def test_multicursor(self):
         c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
         c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
-        mc = TrailDBMultiCursor(False, False, False, batch_size=0)
+        mc = TrailDBMultiCursor(False, False, False)
 
         # not initialized, raise error
         with self.assertRaises(TrailDBError):
@@ -424,52 +424,26 @@ class TestMultiCursor(unittest.TestCase):
         events = list(mc)
 
         self.assertEqual(len(events), 5)
-        self.assertEqual(events[0].time, 1)
-        self.assertEqual(events[0].field1, 'a')
-        self.assertEqual(events[0].field2, '1')
-        self.assertEqual(events[0].field3, 'x')
-        self.assertEqual(events[1].time, 2)
-        self.assertEqual(events[1].field1, 'b')
-        self.assertEqual(events[1].field2, '2')
-        self.assertEqual(events[1].field3, 'x')
+        self.assertEqual(events[0][0].time, 1)
+        self.assertEqual(events[0][0].field1, 'a')
+        self.assertEqual(events[0][0].field2, '1')
+        self.assertEqual(events[0][0].field3, 'x')
+        self.assertEqual(events[1][0].time, 2)
+        self.assertEqual(events[1][0].field1, 'b')
+        self.assertEqual(events[1][0].field2, '2')
+        self.assertEqual(events[1][0].field3, 'x')
         # this one is from the 2nd tdb, has an additional field
-        self.assertEqual(events[2].time, 3)
-        self.assertEqual(events[2].field1, 'c')
-        self.assertEqual(events[2].field2, '3')
-        self.assertEqual(events[2].field3, 'y')
-        self.assertEqual(events[2].field4, 'n')
-
-    def test_multicursor_batch(self):
-        c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
-        c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
-
-        # test with a very small batch size to make sure the batch will get exhausted and refilled at least once
-        mc = TrailDBMultiCursor(False, False, False, batch_size=2)
-        mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
-
-        # exhaust the iterator
-        events = list(mc)
-
-        self.assertEqual(len(events), 5)
-        self.assertEqual(events[0].time, 1)
-        self.assertEqual(events[0].field1, 'a')
-        self.assertEqual(events[0].field2, '1')
-        self.assertEqual(events[0].field3, 'x')
-        self.assertEqual(events[1].time, 2)
-        self.assertEqual(events[1].field1, 'b')
-        self.assertEqual(events[1].field2, '2')
-        self.assertEqual(events[1].field3, 'x')
-        self.assertEqual(events[2].time, 3)
-        self.assertEqual(events[2].field1, 'c')
-        self.assertEqual(events[2].field2, '3')
-        self.assertEqual(events[2].field3, 'y')
-        self.assertEqual(events[2].field4, 'n')
+        self.assertEqual(events[2][0].time, 3)
+        self.assertEqual(events[2][0].field1, 'c')
+        self.assertEqual(events[2][0].field2, '3')
+        self.assertEqual(events[2][0].field3, 'y')
+        self.assertEqual(events[2][0].field4, 'n')
 
     def test_multicursor_reuse(self):
         c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
         c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
-        mc = TrailDBMultiCursor(False, False, False, batch_size=2)
-        mc.set_cursors([c1.cursor, c2.cursor], [self.tdb1, self.tdb2])
+        mc = TrailDBMultiCursor(False, False, False)
+        mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
         # exhaust the iterator
         list(mc)
 
@@ -482,20 +456,20 @@ class TestMultiCursor(unittest.TestCase):
         events = list(mc)
 
         self.assertEqual(len(events), 5)
-        self.assertEqual(events[0].time, 1)
-        self.assertEqual(events[0].field1, 'c')
-        self.assertEqual(events[0].field2, '3')
-        self.assertEqual(events[0].field3, 'y')
-        self.assertEqual(events[3].time, 4)
-        self.assertEqual(events[3].field1, 'a')
-        self.assertEqual(events[3].field2, '1')
-        self.assertEqual(events[3].field3, 'x')
-        self.assertEqual(events[3].field4, 'l')
+        self.assertEqual(events[0][0].time, 1)
+        self.assertEqual(events[0][0].field1, 'c')
+        self.assertEqual(events[0][0].field2, '3')
+        self.assertEqual(events[0][0].field3, 'y')
+        self.assertEqual(events[3][0].time, 4)
+        self.assertEqual(events[3][0].field1, 'a')
+        self.assertEqual(events[3][0].field2, '1')
+        self.assertEqual(events[3][0].field3, 'x')
+        self.assertEqual(events[3][0].field4, 'l')
 
     def test_multicursor_raw_items_parsetime(self):
         c1 = self.tdb1.trail(self.tdb1.get_trail_id(self.uuid1))
         c2 = self.tdb2.trail(self.tdb2.get_trail_id(self.uuid1))
-        mc = TrailDBMultiCursor(True, True, False, batch_size=0)
+        mc = TrailDBMultiCursor(True, True, False)
         mc.set_cursors([c1, c2], [self.tdb1, self.tdb2])
         # exhaust the iterator
         events = list(mc)

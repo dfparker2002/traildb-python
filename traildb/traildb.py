@@ -59,7 +59,7 @@ class tdb_event(Structure):
                 ("items", POINTER(tdb_item))]
 
 class tdb_multi_event(Structure):
-    _fields_ = [("tdb", tdb),
+    _fields_ = [("db", tdb),
                 ("tdb_event", POINTER(tdb_event)),
                 ("cursor_idx", c_uint64)]
 
@@ -120,7 +120,7 @@ api(lib.tdb_cursor_set_event_filter, [tdb_cursor, tdb_event_filter], tdb_error)
 api(lib.tdb_multi_cursor_new, [POINTER(tdb_cursor), c_uint64], tdb_multi_cursor)
 api(lib.tdb_multi_cursor_free, [tdb_multi_cursor])
 api(lib.tdb_multi_cursor_reset, [tdb_multi_cursor])
-api(lib.tdb_multi_cursor_next, [tdb_multi_cursor], tdb_multi_event)
+api(lib.tdb_multi_cursor_next, [tdb_multi_cursor], POINTER(tdb_multi_event))
 api(lib.tdb_multi_cursor_next_batch, [tdb_multi_cursor, POINTER(tdb_multi_event), c_uint64])
 
 api(lib.tdb_event_filter_new, [], tdb_event_filter)
@@ -356,25 +356,22 @@ class TrailDBMultiCursor(object):
 
     To use, initialize and then set the cursors using the set_cursors method.
     To reuse a multicursor, set new trails on the underlying cursors and then
-    call TrailDBMultiCursor.reset(). If filtering, apply event filters to the underlying
+    call :py:meth:`~traildb.TrailDBMultiCursor.reset()`. If filtering, apply event filters to the underlying
     cursors individually before setting them on the multicursor, or call reset after doing so
     if already set.
     """
 
-    def __init__(self, parsetime, rawitems, only_timestamp, batch_size=1000):
+    def __init__(self, parsetime, rawitems, only_timestamp):
         """
         :param parsetime: If True, returns datetime objects instead of integer timestamps.
         :param rawitems: Return raw integer items instead of stringified values. Using raw items is usually a bit more efficient than using string values.
         :param only_timestamp: If True, only return timestamps, not event objects.
-        :param batch_size: max number of events to fetch at once (optimization - doesn't change iteration behavior)
         """
         self.parsetime = parsetime
         self.rawitems = rawitems
         self.only_timestamp = only_timestamp
-        self.batch_size = batch_size
         self.multicursor = None
         self._ready = False
-        self._init_batch()
 
     def __del__(self):
         if self.multicursor:
@@ -384,53 +381,27 @@ class TrailDBMultiCursor(object):
         return self
 
     def __next__(self):
-        """ return the next event in the combined trails, in ascending timestamp order """
+        """
+        return the next event in the combined trails, in ascending timestamp order
+
+        this will return tuples in the form of `(event, traildb)`, where the traildb
+        is the :py:class:`~traildb.TrailDB` the event belongs to. This can be used to
+        get the values if rawitems is used.
+        """
         if not self._ready:
             raise TrailDBError("Multicursor not initialized, call set_cursors")
 
-        if self.batch_size:
-            # fetch another batch if the array of events has been exhausted
-            # this is also true for the first iteration, as both are 0
-            if self._batch_idx == self._current_batch_size:
-                n_events = self._next_batch()
-                if not n_events:
-                    raise StopIteration()
-                self._batch_idx = 0
-
-            # return the next event in the batch:
-            event = self.to_event(self._batch[self._batch_idx])
-            self._batch_idx += 1
+        multi_event = lib.tdb_multi_cursor_next(self.multicursor)
+        if multi_event:
+            event = self.to_event(multi_event.contents)
         else:
-            multi_event = lib.tdb_multi_cursor_next(self.multicursor)
-            if multi_event:
-                event = self.to_event(multi_event.contents)
-            else:
-                raise StopIteration()
+            raise StopIteration()
 
         return event
 
-    def _init_batch(self):
-        if self.batch_size:
-            self._batch = (tdb_multi_event * self.batch_size)()
-            self._batch_idx = 0
-            self._current_batch_size = 0
-        else:
-            self._batch = None
-            self._batch_idx = None
-            self._current_batch_size = None
-
-    def _next_batch(self):
-        n_events = lib.tdb_multi_cursor_next_batch(
-            self.multicursor,
-            self._batch,
-            self.batch_size,
-        )
-        self._current_batch_size = n_events
-        return n_events
-
     def to_event(self, multi_event):
         event = multi_event.tdb_event
-        tdb_ptr = multi_event.tdb
+        tdb_ptr = multi_event.db
 
         timestamp = event.contents.timestamp
         if self.parsetime:
@@ -448,16 +419,16 @@ class TrailDBMultiCursor(object):
         items = (tdb_item * event.contents.num_items).from_address(address)
 
         if self.rawitems:
-            return traildb._event_cls(False, timestamp, *items)
+            return traildb._event_cls(True, timestamp, *items), traildb
         else:
-            return traildb._event_cls(True, timestamp, *items)
+            return traildb._event_cls(False, timestamp, *items), traildb
 
     def set_cursors(self, cursors, traildbs):
         """
         configure this multicursor to merge the specified cursors. This is required before use.
 
-        :param cursors: list of TrailDBCursor instances to merge
-        :param traildbs: list of TrailDB instances from which the cursors were created (only needs to be specified once, even if there are multiple cursors from the same TrailDB)
+        :param cursors: list of :py:class:`~traildb.TrailDBCursor` instances to merge
+        :param traildbs: list of :py:class:`~traildb.TrailDB` instances from which the cursors were created (only needs to be specified once, even if there are multiple cursors from the same TrailDB)
         """
 
         n_cursors = len(cursors)
@@ -465,7 +436,7 @@ class TrailDBMultiCursor(object):
 
         # maintain references to these in python so they wont get garbage collected
         self._cursor_arr = cursor_array
-        self._cursors = cursors
+        self.cursors = cursors
 
         self.multicursor = lib.tdb_multi_cursor_new(cursor_array, n_cursors)
         if self.multicursor is None:
