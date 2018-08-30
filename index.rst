@@ -21,6 +21,9 @@ These are Python 2 bindings to TrailDB. Official TrailDB website is at http://tr
 .. autoclass:: traildb.TrailDBCursor
    :members:
 
+.. autoclass:: traildb.TrailDBMultiCursor
+   :members:
+
 .. autoclass:: traildb.TrailDBEventFilter
    :members:
 
