@@ -748,7 +748,10 @@ class TrailDB(object):
                                lib.tdb_error(self._db))
 
         if self.decode:
-            return value[0:self._uint64_ptr.contents.value].decode(CODEC)
+            try:
+                return value[0:self._uint64_ptr.contents.value].decode(CODEC)
+            except UnicodeDecodeError:
+                return value[0:self._uint64_ptr.contents.value]
 
         return value[0:self._uint64_ptr.contents.value]
 
@@ -761,7 +764,10 @@ class TrailDB(object):
                                lib.tdb_error(self._db))
 
         if self.decode:
-            return value[0:self._uint64_ptr.contents.value].decode(CODEC)
+            try:
+                return value[0:self._uint64_ptr.contents.value].decode(CODEC)
+            except UnicodeDecodeError:
+                return value[0:self._uint64_ptr.contents.value]
 
         return value[0:self._uint64_ptr.contents.value]
 
